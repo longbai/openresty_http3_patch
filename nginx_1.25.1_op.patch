@@ -1873,13 +1873,3 @@ diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.h ngx_p
 +
  
  #endif /* _NGX_STREAM_UPSTREAM_ROUND_ROBIN_H_INCLUDED_ */
-diff -uNr bundle/nginx-1.25.1/.vscode/settings.json ngx_pr/bundle/nginx-1.25.1/.vscode/settings.json
---- bundle/nginx-1.25.1/.vscode/settings.json	1970-01-01 08:00:00.000000000 +0800
-+++ ngx_pr/bundle/nginx-1.25.1/.vscode/settings.json	2023-07-06 15:08:30.000000000 +0800
-@@ -0,0 +1,5 @@
-+{
-+    "files.associations": {
-+        "conf": "c"
-+    }
-+}
-\ No newline at end of file
