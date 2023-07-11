@@ -1,0 +1,1885 @@
+diff -uNr bundle/nginx-1.25.1/auto/cc/clang ngx_pr/bundle/nginx-1.25.1/auto/cc/clang
+--- bundle/nginx-1.25.1/auto/cc/clang	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/auto/cc/clang	2023-07-06 15:05:30.000000000 +0800
+@@ -89,7 +89,7 @@
+ fi
+ 
+ # stop on warning
+-CFLAGS="$CFLAGS -Werror"
++#CFLAGS="$CFLAGS -Werror"
+ 
+ # debug
+ CFLAGS="$CFLAGS -g"
+diff -uNr bundle/nginx-1.25.1/auto/cc/conf ngx_pr/bundle/nginx-1.25.1/auto/cc/conf
+--- bundle/nginx-1.25.1/auto/cc/conf	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/auto/cc/conf	2023-07-06 15:08:30.000000000 +0800
+@@ -144,7 +144,7 @@
+ CFLAGS="$CFLAGS $NGX_CC_OPT"
+ NGX_TEST_LD_OPT="$NGX_LD_OPT"
+ 
+-if [ "$NGX_PLATFORM" != win32 ]; then
++if [ 1 ]; then
+ 
+     if test -n "$NGX_LD_OPT"; then
+         ngx_feature=--with-ld-opt=\"$NGX_LD_OPT\"
+diff -uNr bundle/nginx-1.25.1/auto/cc/gcc ngx_pr/bundle/nginx-1.25.1/auto/cc/gcc
+--- bundle/nginx-1.25.1/auto/cc/gcc	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/auto/cc/gcc	2023-07-06 15:09:01.000000000 +0800
+@@ -166,7 +166,7 @@
+ 
+ 
+ # stop on warning
+-CFLAGS="$CFLAGS -Werror"
++#CFLAGS="$CFLAGS -Werror"
+ 
+ # debug
+ CFLAGS="$CFLAGS -g"
+diff -uNr bundle/nginx-1.25.1/auto/cc/icc ngx_pr/bundle/nginx-1.25.1/auto/cc/icc
+--- bundle/nginx-1.25.1/auto/cc/icc	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/auto/cc/icc	2023-07-06 15:09:19.000000000 +0800
+@@ -111,7 +111,7 @@
+ esac
+ 
+ # stop on warning
+-CFLAGS="$CFLAGS -Werror"
++#CFLAGS="$CFLAGS -Werror"
+ 
+ # debug
+ CFLAGS="$CFLAGS -g"
+diff -uNr bundle/nginx-1.25.1/auto/options ngx_pr/bundle/nginx-1.25.1/auto/options
+--- bundle/nginx-1.25.1/auto/options	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/auto/options	2023-07-07 14:59:01.000000000 +0800
+@@ -366,6 +366,7 @@
+         --with-pcre)                     USE_PCRE=YES               ;;
+         --with-pcre=*)                   PCRE="$value"              ;;
+         --with-pcre-opt=*)               PCRE_OPT="$value"          ;;
++        --with-pcre-conf-opt=*)          PCRE_CONF_OPT="$value"     ;;
+         --with-pcre-jit)                 PCRE_JIT=YES               ;;
+         --without-pcre2)                 PCRE2=DISABLED             ;;
+ 
+@@ -586,6 +587,7 @@
+   --with-pcre                        force PCRE library usage
+   --with-pcre=DIR                    set path to PCRE library sources
+   --with-pcre-opt=OPTIONS            set additional build options for PCRE
++  --with-pcre-conf-opt=OPTIONS       set additional configure options for PCRE
+   --with-pcre-jit                    build PCRE with JIT compilation support
+   --without-pcre2                    do not use PCRE2 library
+ 
+diff -uNr bundle/nginx-1.25.1/auto/unix ngx_pr/bundle/nginx-1.25.1/auto/unix
+--- bundle/nginx-1.25.1/auto/unix	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/auto/unix	2023-07-06 15:16:16.000000000 +0800
+@@ -1050,3 +1050,27 @@
+                   if (getaddrinfo("localhost", NULL, NULL, &res) != 0) return 1;
+                   freeaddrinfo(res)'
+ . auto/feature
++
++ngx_feature="SOCK_CLOEXEC support"
++ngx_feature_name="NGX_HAVE_SOCKET_CLOEXEC"
++ngx_feature_run=no
++ngx_feature_incs="#include <sys/types.h>
++                  #include <sys/socket.h>"
++ngx_feature_path=
++ngx_feature_libs=
++ngx_feature_test="int fd;
++                  fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);"
++. auto/feature
++
++ngx_feature="FD_CLOEXEC support"
++ngx_feature_name="NGX_HAVE_FD_CLOEXEC"
++ngx_feature_run=no
++ngx_feature_incs="#include <sys/types.h>
++                  #include <sys/socket.h>
++                  #include <fcntl.h>"
++ngx_feature_path=
++ngx_feature_libs=
++ngx_feature_test="int fd;
++                  fd = socket(AF_INET, SOCK_STREAM, 0);
++                  fcntl(fd, F_SETFD, FD_CLOEXEC);"
++. auto/feature
+diff -uNr bundle/nginx-1.25.1/src/core/nginx.c ngx_pr/bundle/nginx-1.25.1/src/core/nginx.c
+--- bundle/nginx-1.25.1/src/core/nginx.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/nginx.c	2023-07-06 15:23:24.000000000 +0800
+@@ -187,7 +187,7 @@
+ static u_char      *ngx_conf_file;
+ static u_char      *ngx_conf_params;
+ static char        *ngx_signal;
+-
++ngx_pool_t         *saved_init_cycle_pool = NULL;
+ 
+ static char **ngx_os_environ;
+ 
+@@ -255,6 +255,8 @@
+         return 1;
+     }
+ 
++    saved_init_cycle_pool = init_cycle.pool;
++
+     if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
+         return 1;
+     }
+@@ -1064,6 +1066,8 @@
+ 
+     ccf->daemon = NGX_CONF_UNSET;
+     ccf->master = NGX_CONF_UNSET;
++    ccf->privileged_agent = NGX_CONF_UNSET;
++    ccf->privileged_agent_connections = NGX_CONF_UNSET_UINT;
+     ccf->timer_resolution = NGX_CONF_UNSET_MSEC;
+     ccf->shutdown_timeout = NGX_CONF_UNSET_MSEC;
+ 
+@@ -1093,6 +1097,8 @@
+ 
+     ngx_conf_init_value(ccf->daemon, 1);
+     ngx_conf_init_value(ccf->master, 1);
++    ngx_conf_init_value(ccf->privileged_agent, 0);
++    ngx_conf_init_uint_value(ccf->privileged_agent_connections, 512);
+     ngx_conf_init_msec_value(ccf->timer_resolution, 0);
+     ngx_conf_init_msec_value(ccf->shutdown_timeout, 0);
+ 
+diff -uNr bundle/nginx-1.25.1/src/core/nginx.h ngx_pr/bundle/nginx-1.25.1/src/core/nginx.h
+--- bundle/nginx-1.25.1/src/core/nginx.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/nginx.h	2023-07-06 15:24:42.000000000 +0800
+@@ -11,7 +11,7 @@
+ 
+ #define nginx_version      1025001
+ #define NGINX_VERSION      "1.25.1"
+-#define NGINX_VER          "nginx/" NGINX_VERSION
++#define NGINX_VER          "openresty/" NGINX_VERSION ".1"
+ 
+ #ifdef NGX_BUILD
+ #define NGINX_VER_BUILD    NGINX_VER " (" NGX_BUILD ")"
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_connection.c ngx_pr/bundle/nginx-1.25.1/src/core/ngx_connection.c
+--- bundle/nginx-1.25.1/src/core/ngx_connection.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_connection.c	2023-07-07 14:59:01.000000000 +0800
+@@ -1115,6 +1115,11 @@
+         }
+ #endif
+ 
++#if (NGX_HAVE_REUSEPORT)
++        if (ls[i].fd == (ngx_socket_t) -1) {
++            continue;
++        }
++#endif
+         c = ls[i].connection;
+ 
+         if (c) {
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_core.h ngx_pr/bundle/nginx-1.25.1/src/core/ngx_core.h
+--- bundle/nginx-1.25.1/src/core/ngx_core.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_core.h	2023-07-06 15:31:40.000000000 +0800
+@@ -117,4 +117,6 @@
+ #define NGX_DISABLE_SYMLINKS_NOTOWNER   2
+ #endif
+ 
++extern ngx_pool_t        *saved_init_cycle_pool;
++
+ #endif /* _NGX_CORE_H_INCLUDED_ */
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_cycle.c ngx_pr/bundle/nginx-1.25.1/src/core/ngx_cycle.c
+--- bundle/nginx-1.25.1/src/core/ngx_cycle.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_cycle.c	2023-07-06 15:34:26.000000000 +0800
+@@ -768,6 +768,10 @@
+ 
+     if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
+ 
++        if (ngx_is_init_cycle(old_cycle)) {
++            saved_init_cycle_pool = NULL;
++        }
++
+         ngx_destroy_pool(old_cycle->pool);
+         cycle->old_cycle = NULL;
+ 
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_cycle.h ngx_pr/bundle/nginx-1.25.1/src/core/ngx_cycle.h
+--- bundle/nginx-1.25.1/src/core/ngx_cycle.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_cycle.h	2023-07-06 15:38:57.000000000 +0800
+@@ -22,9 +22,17 @@
+ #define NGX_DEBUG_POINTS_ABORT  2
+ 
+ 
++#define HAVE_PRIVILEGED_PROCESS_PATCH   1
++
++
++#define HAVE_INTERCEPT_ERROR_LOG_PATCH
++
++
+ typedef struct ngx_shm_zone_s  ngx_shm_zone_t;
+ 
+ typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
++typedef ngx_int_t (*ngx_log_intercept_pt) (ngx_log_t *log, ngx_uint_t level,
++    u_char *buf, size_t len);
+ 
+ struct ngx_shm_zone_s {
+     void                     *data;
+@@ -83,12 +91,18 @@
+     ngx_str_t                 error_log;
+     ngx_str_t                 lock_file;
+     ngx_str_t                 hostname;
++
++    ngx_log_intercept_pt      intercept_error_log_handler;
++    void                     *intercept_error_log_data;
++    unsigned                  entered_logger;    /* :1 */
+ };
+ 
+ 
+ typedef struct {
+     ngx_flag_t                daemon;
+     ngx_flag_t                master;
++    ngx_flag_t                privileged_agent;
++    ngx_uint_t                privileged_agent_connections;
+ 
+     ngx_msec_t                timer_resolution;
+     ngx_msec_t                shutdown_timeout;
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_log.c ngx_pr/bundle/nginx-1.25.1/src/core/ngx_log.c
+--- bundle/nginx-1.25.1/src/core/ngx_log.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_log.c	2023-07-06 15:44:51.000000000 +0800
+@@ -112,6 +112,9 @@
+     ngx_uint_t   wrote_stderr, debug_connection;
+     u_char       errstr[NGX_MAX_ERROR_STR];
+ 
++    ngx_log_intercept_pt    log_intercept = NULL;
++
++
+     last = errstr + NGX_MAX_ERROR_STR;
+ 
+     p = ngx_cpymem(errstr, ngx_cached_err_log_time.data,
+@@ -153,6 +156,16 @@
+         p = last - NGX_LINEFEED_SIZE;
+     }
+ 
++    if (ngx_cycle) {
++        log_intercept = ngx_cycle->intercept_error_log_handler;
++    }
++
++    if (log_intercept && !ngx_cycle->entered_logger) {
++        ngx_cycle->entered_logger = 1;
++        log_intercept(log, level, errstr, p - errstr);
++        ngx_cycle->entered_logger = 0;
++    }
++
+     ngx_linefeed(p);
+ 
+     wrote_stderr = 0;
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_log.h ngx_pr/bundle/nginx-1.25.1/src/core/ngx_log.h
+--- bundle/nginx-1.25.1/src/core/ngx_log.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_log.h	2023-07-06 15:45:47.000000000 +0800
+@@ -73,8 +73,9 @@
+ };
+ 
+ 
+-#define NGX_MAX_ERROR_STR   2048
+-
++#ifndef NGX_MAX_ERROR_STR
++#define NGX_MAX_ERROR_STR   4096
++#endif
+ 
+ /*********************************/
+ 
+diff -uNr bundle/nginx-1.25.1/src/core/ngx_resolver.c ngx_pr/bundle/nginx-1.25.1/src/core/ngx_resolver.c
+--- bundle/nginx-1.25.1/src/core/ngx_resolver.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/core/ngx_resolver.c	2023-07-06 16:08:45.000000000 +0800
+@@ -9,12 +9,26 @@
+ #include <ngx_core.h>
+ #include <ngx_event.h>
+ 
++#if !(NGX_WIN32)
++#include <resolv.h>
++#endif
++
+ 
+ #define NGX_RESOLVER_UDP_SIZE   4096
+ 
+ #define NGX_RESOLVER_TCP_RSIZE  (2 + 65535)
+ #define NGX_RESOLVER_TCP_WSIZE  8192
+ 
++#if !(NGX_WIN32)
++/*
++ * note that 2KB should be more than enough for majority of the
++ * resolv.conf files out there. it also acts as a safety guard to prevent
++ * abuse.
++ */
++#define NGX_RESOLVER_FILE_BUF_SIZE  2048
++#define NGX_RESOLVER_FILE_NAME      "/etc/resolv.conf"
++#endif
++
+ 
+ typedef struct {
+     u_char  ident_hi;
+@@ -129,6 +143,191 @@
+ #endif
+ 
+ 
++#if !(NGX_WIN32)
++static ngx_int_t
++ngx_resolver_read_resolv_conf(ngx_conf_t *cf, ngx_resolver_t *r, u_char *path,
++    size_t path_len)
++{
++    ngx_url_t                        u;
++    ngx_resolver_connection_t       *rec;
++    ngx_fd_t                         fd;
++    ngx_file_t                       file;
++    u_char                           buf[NGX_RESOLVER_FILE_BUF_SIZE];
++    u_char                           ipv6_buf[NGX_INET6_ADDRSTRLEN];
++    ngx_uint_t                       address = 0, j, total = 0;
++    ssize_t                          n, i;
++    enum {
++        sw_nameserver,
++        sw_spaces,
++        sw_address,
++        sw_skip
++    } state;
++
++    file.name.data = path;
++    file.name.len = path_len;
++
++    if (ngx_conf_full_name(cf->cycle, &file.name, 1) != NGX_OK) {
++        return NGX_ERROR;
++    }
++
++    fd = ngx_open_file(file.name.data, NGX_FILE_RDONLY,
++                       NGX_FILE_OPEN, 0);
++
++    if (fd == NGX_INVALID_FILE) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
++                           ngx_open_file_n " \"%s\" failed", file.name.data);
++
++        return NGX_ERROR;
++    }
++
++    ngx_memzero(&file, sizeof(ngx_file_t));
++
++    file.fd = fd;
++    file.log = cf->log;
++
++    state = sw_nameserver;
++
++    n = ngx_read_file(&file, buf, NGX_RESOLVER_FILE_BUF_SIZE, 0);
++
++    if (n == NGX_ERROR) {
++        ngx_conf_log_error(NGX_LOG_ALERT, cf, ngx_errno,
++                           ngx_read_file_n " \"%s\" failed", file.name.data);
++    }
++
++    if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
++        ngx_conf_log_error(NGX_LOG_ALERT, cf, ngx_errno,
++                           ngx_close_file_n " \"%s\" failed", file.name.data);
++    }
++
++    if (n == NGX_ERROR) {
++        return NGX_ERROR;
++    }
++
++    if (n == 0) {
++        return NGX_OK;
++    }
++
++    for (i = 0; i < n && total < MAXNS; /* void */) {
++        if (buf[i] == '#' || buf[i] == ';') {
++            state = sw_skip;
++        }
++
++        switch (state) {
++
++        case sw_nameserver:
++
++            if ((size_t) n - i >= sizeof("nameserver") - 1
++                && ngx_memcmp(buf + i, "nameserver",
++                              sizeof("nameserver") - 1) == 0)
++            {
++                state = sw_spaces;
++                i += sizeof("nameserver") - 1;
++
++                continue;
++            }
++
++            break;
++
++        case sw_spaces:
++            if (buf[i] != '\t' && buf[i] != ' ') {
++                address = i;
++                state = sw_address;
++            }
++
++            break;
++
++        case sw_address:
++
++            if (buf[i] == CR || buf[i] == LF || i == n - 1) {
++                ngx_memzero(&u, sizeof(ngx_url_t));
++
++                u.url.data = buf + address;
++
++                if (i == n - 1 && buf[i] != CR && buf[i] != LF) {
++                    u.url.len = n - address;
++
++                } else {
++                    u.url.len = i - address;
++                }
++
++                u.default_port = 53;
++
++                /* IPv6? */
++                if (ngx_strlchr(u.url.data, u.url.data + u.url.len,
++                                ':') != NULL)
++                {
++                    if (u.url.len + 2 > sizeof(ipv6_buf)) {
++                        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                                           "IPv6 resolver address is too long:"
++                                           " \"%V\"", &u.url);
++
++                        return NGX_ERROR;
++                    }
++
++                    ipv6_buf[0] = '[';
++                    ngx_memcpy(ipv6_buf + 1, u.url.data, u.url.len);
++                    ipv6_buf[u.url.len + 1] = ']';
++
++                    u.url.data = ipv6_buf;
++                    u.url.len = u.url.len + 2;
++                }
++
++                if (ngx_parse_url(cf->pool, &u) != NGX_OK) {
++                    if (u.err) {
++                        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                                           "%s in resolver \"%V\"",
++                                           u.err, &u.url);
++                    }
++
++                    return NGX_ERROR;
++                }
++
++                rec = ngx_array_push_n(&r->connections, u.naddrs);
++                if (rec == NULL) {
++                    return NGX_ERROR;
++                }
++
++                ngx_memzero(rec, u.naddrs * sizeof(ngx_resolver_connection_t));
++
++                for (j = 0; j < u.naddrs; j++) {
++                    rec[j].sockaddr = u.addrs[j].sockaddr;
++                    rec[j].socklen = u.addrs[j].socklen;
++                    rec[j].server = u.addrs[j].name;
++                    rec[j].resolver = r;
++                }
++
++                total++;
++
++#if (NGX_DEBUG)
++                /*
++                 * logs with level below NGX_LOG_NOTICE will not be printed
++                 * in this early phase
++                 */
++                ngx_conf_log_error(NGX_LOG_NOTICE, cf, 0,
++                                   "parsed a resolver: \"%V\"", &u.url);
++#endif
++
++                state = sw_nameserver;
++            }
++
++            break;
++
++        case sw_skip:
++            if (buf[i] == CR || buf[i] == LF) {
++                state = sw_nameserver;
++            }
++
++            break;
++        }
++
++        i++;
++    }
++
++    return NGX_OK;
++}
++#endif
++
++
+ ngx_resolver_t *
+ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
+ {
+@@ -262,6 +461,39 @@
+         }
+ #endif
+ 
++#if !(NGX_WIN32)
++        if (ngx_strncmp(names[i].data, "local=", 6) == 0) {
++
++            if (ngx_strcmp(&names[i].data[6], "on") == 0) {
++                if (ngx_resolver_read_resolv_conf(cf, r,
++                                                  (u_char *)
++                                                  NGX_RESOLVER_FILE_NAME,
++                                                  sizeof(NGX_RESOLVER_FILE_NAME)
++                                                  - 1)
++                    != NGX_OK)
++                {
++                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                                       "unable to parse local resolver");
++                    return NULL;
++                }
++
++            } else if (ngx_strcmp(&names[i].data[6], "off") != 0) {
++                if (ngx_resolver_read_resolv_conf(cf, r,
++                                                  &names[i].data[6],
++                                                  names[i].len - 6)
++                    != NGX_OK)
++                {
++                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                                       "unable to parse local resolver");
++                    return NULL;
++                }
++
++            }
++
++            continue;
++        }
++#endif
++
+         ngx_memzero(&u, sizeof(ngx_url_t));
+ 
+         u.url = names[i];
+@@ -4551,8 +4783,14 @@
+     ngx_event_t       *rev, *wev;
+     ngx_connection_t  *c;
+ 
++#if (NGX_HAVE_SOCKET_CLOEXEC)
++    s = ngx_socket(rec->sockaddr->sa_family, SOCK_STREAM | SOCK_CLOEXEC, 0);
++
++#else
+     s = ngx_socket(rec->sockaddr->sa_family, SOCK_STREAM, 0);
+ 
++#endif
++
+     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, &rec->log, 0, "TCP socket %d", s);
+ 
+     if (s == (ngx_socket_t) -1) {
+@@ -4579,6 +4817,15 @@
+         goto failed;
+     }
+ 
++#if (NGX_HAVE_FD_CLOEXEC)
++    if (ngx_cloexec(s) == -1) {
++        ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
++                      ngx_cloexec_n " failed");
++
++        goto failed;
++    }
++#endif
++
+     rev = c->read;
+     wev = c->write;
+ 
+diff -uNr bundle/nginx-1.25.1/src/event/modules/ngx_iocp_module.c ngx_pr/bundle/nginx-1.25.1/src/event/modules/ngx_iocp_module.c
+--- bundle/nginx-1.25.1/src/event/modules/ngx_iocp_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/modules/ngx_iocp_module.c	2023-07-06 18:48:09.000000000 +0800
+@@ -231,8 +231,9 @@
+ }
+ 
+ 
+-static ngx_int_t
+-ngx_iocp_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
++static
++ngx_int_t ngx_iocp_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
++    ngx_uint_t flags)
+ {
+     int                rc;
+     u_int              key;
+@@ -355,7 +356,7 @@
+ 
+     cf = ngx_palloc(cycle->pool, sizeof(ngx_iocp_conf_t));
+     if (cf == NULL) {
+-        return NULL;
++        return NGX_CONF_ERROR;
+     }
+ 
+     cf->threads = NGX_CONF_UNSET;
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_accept.c ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_accept.c
+--- bundle/nginx-1.25.1/src/event/ngx_event_accept.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_accept.c	2023-07-06 16:23:44.000000000 +0800
+@@ -60,7 +60,7 @@
+ 
+ #if (NGX_HAVE_ACCEPT4)
+         if (use_accept4) {
+-            s = accept4(lc->fd, &sa.sockaddr, &socklen, SOCK_NONBLOCK);
++            s = accept4(lc->fd, &sa.sockaddr, &socklen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+         } else {
+             s = accept(lc->fd, &sa.sockaddr, &socklen);
+         }
+@@ -200,6 +200,14 @@
+                     ngx_close_accepted_connection(c);
+                     return;
+                 }
++#if (NGX_HAVE_FD_CLOEXEC)
++                if (ngx_cloexec(s) == -1) {
++                    ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
++                                  ngx_cloexec_n " failed");
++                    ngx_close_accepted_connection(c);
++                    return;
++                }
++#endif
+             }
+         }
+ 
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event.c ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event.c
+--- bundle/nginx-1.25.1/src/event/ngx_event.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event.c	2023-07-06 16:16:42.000000000 +0800
+@@ -197,6 +197,9 @@
+     ngx_uint_t  flags;
+     ngx_msec_t  timer, delta;
+ 
++    ngx_queue_t     *q;
++    ngx_event_t     *ev;
++
+     if (ngx_timer_resolution) {
+         timer = NGX_TIMER_INFINITE;
+         flags = 0;
+@@ -216,6 +219,13 @@
+ #endif
+     }
+ 
++    if (!ngx_queue_empty(&ngx_posted_delayed_events)) {
++        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
++                       "posted delayed event queue not empty"
++                       " making poll timeout 0");
++        timer = 0;
++    }
++
+     if (ngx_use_accept_mutex) {
+         if (ngx_accept_disabled > 0) {
+             ngx_accept_disabled--;
+@@ -261,6 +271,35 @@
+     ngx_event_expire_timers();
+ 
+     ngx_event_process_posted(cycle, &ngx_posted_events);
++
++    while (!ngx_queue_empty(&ngx_posted_delayed_events)) {
++        q = ngx_queue_head(&ngx_posted_delayed_events);
++
++        ev = ngx_queue_data(q, ngx_event_t, queue);
++        if (ev->delayed) {
++            /* start of newly inserted nodes */
++            for (/* void */;
++                 q != ngx_queue_sentinel(&ngx_posted_delayed_events);
++                 q = ngx_queue_next(q))
++            {
++                ev = ngx_queue_data(q, ngx_event_t, queue);
++                ev->delayed = 0;
++
++                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
++                               "skipping delayed posted event %p,"
++                               " till next iteration", ev);
++            }
++
++            break;
++        }
++
++        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
++                       "delayed posted event %p", ev);
++
++        ngx_delete_posted_event(ev);
++
++        ev->handler(ev);
++    }
+ }
+ 
+ 
+@@ -671,6 +710,7 @@
+     ngx_queue_init(&ngx_posted_accept_events);
+     ngx_queue_init(&ngx_posted_next_events);
+     ngx_queue_init(&ngx_posted_events);
++    ngx_queue_init(&ngx_posted_delayed_events);
+ 
+     if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {
+         return NGX_ERROR;
+@@ -806,6 +846,18 @@
+ 
+ #if (NGX_HAVE_REUSEPORT)
+         if (ls[i].reuseport && ls[i].worker != ngx_worker) {
++            ngx_log_debug2(NGX_LOG_DEBUG_CORE, cycle->log, 0,
++                           "closing unused fd:%d listening on %V",
++                           ls[i].fd, &ls[i].addr_text);
++
++            if (ngx_close_socket(ls[i].fd) == -1) {
++                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
++                              ngx_close_socket_n " %V failed",
++                              &ls[i].addr_text);
++            }
++
++            ls[i].fd = (ngx_socket_t) -1;
++            
+             continue;
+         }
+ #endif
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_connect.c ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_connect.c
+--- bundle/nginx-1.25.1/src/event/ngx_event_connect.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_connect.c	2023-07-06 16:26:08.000000000 +0800
+@@ -38,8 +38,15 @@
+ 
+     type = (pc->type ? pc->type : SOCK_STREAM);
+ 
++#if (NGX_HAVE_SOCKET_CLOEXEC)
++    s = ngx_socket(pc->sockaddr->sa_family, type | SOCK_CLOEXEC, 0);
++
++#else
+     s = ngx_socket(pc->sockaddr->sa_family, type, 0);
+ 
++#endif
++
++
+     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, pc->log, 0, "%s socket %d",
+                    (type == SOCK_STREAM) ? "stream" : "dgram", s);
+ 
+@@ -92,6 +99,15 @@
+         goto failed;
+     }
+ 
++#if (NGX_HAVE_FD_CLOEXEC)
++    if (ngx_cloexec(s) == -1) {
++        ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
++                      ngx_cloexec_n " failed");
++
++        goto failed;
++    }
++#endif
++
+     if (pc->local) {
+ 
+ #if (NGX_HAVE_TRANSPARENT_PROXY)
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_connectex.c ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_connectex.c
+--- bundle/nginx-1.25.1/src/event/ngx_event_connectex.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_connectex.c	2023-07-06 18:49:14.000000000 +0800
+@@ -127,8 +127,8 @@
+     conn[0] = NULL;
+ 
+     for ( ;; ) {
+-        offset = (nevents == WSA_MAXIMUM_WAIT_EVENTS + 1) ? 1 : 0;
+-        timeout = (nevents == 1 && !first) ? 60000 : INFINITE;
++        offset = (nevents == WSA_MAXIMUM_WAIT_EVENTS + 1) ? 1: 0;
++        timeout = (nevents == 1 && !first) ? 60000: INFINITE;
+ 
+         n = WSAWaitForMultipleEvents(nevents - offset, events[offset],
+                                      0, timeout, 0);
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event.h ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event.h
+--- bundle/nginx-1.25.1/src/event/ngx_event.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event.h	2023-07-06 16:17:55.000000000 +0800
+@@ -73,6 +73,9 @@
+     /* to test on worker exit */
+     unsigned         channel:1;
+     unsigned         resolver:1;
++#if (HAVE_SOCKET_CLOEXEC_PATCH)
++    unsigned         skip_socket_leak_check:1;
++#endif
+ 
+     unsigned         cancelable:1;
+ 
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_openssl.h ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_openssl.h
+--- bundle/nginx-1.25.1/src/event/ngx_event_openssl.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_openssl.h	2023-07-06 16:17:55.000000000 +0800
+@@ -164,6 +164,7 @@
+     unsigned                    shared:1;
+ } ngx_ssl_ticket_key_t;
+
++typedef ngx_ssl_ticket_key_t ngx_ssl_session_ticket_key_t;
+
+ typedef struct {
+     ngx_rbtree_t                session_rbtree;
+@@ -335,5 +336,6 @@
+ extern int  ngx_ssl_certificate_name_index;
+ extern int  ngx_ssl_stapling_index;
+
++#define  ngx_ssl_session_ticket_keys_index ngx_ssl_ticket_keys_index
+
+ #endif /* _NGX_EVENT_OPENSSL_H_INCLUDED_ */
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_openssl.c ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_openssl.c
+--- bundle/nginx-1.25.1/src/event/ngx_event_openssl.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_openssl.c	2023-07-06 16:48:40.000000000 +0800
+@@ -1877,6 +1877,31 @@
+         return NGX_AGAIN;
+     }
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x10002000L
++    if (sslerr == SSL_ERROR_WANT_X509_LOOKUP
++#   ifdef SSL_ERROR_PENDING_SESSION
++        || sslerr == SSL_ERROR_PENDING_SESSION
++#   endif
++#   ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
++        || sslerr == SSL_ERROR_WANT_CLIENT_HELLO_CB
++#   endif
++       )
++    {
++        c->read->handler = ngx_ssl_handshake_handler;
++        c->write->handler = ngx_ssl_handshake_handler;
++
++        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        return NGX_AGAIN;
++    }
++#endif
++
+     err = (sslerr == SSL_ERROR_SYSCALL) ? ngx_errno : 0;
+ 
+     c->ssl->no_wait_shutdown = 1;
+@@ -2023,6 +2048,55 @@
+ 
+         return NGX_AGAIN;
+     }
++    
++    if (sslerr == SSL_ERROR_WANT_X509_LOOKUP) {
++        c->read->handler = ngx_ssl_handshake_handler;
++        c->write->handler = ngx_ssl_handshake_handler;
++
++        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        return NGX_AGAIN;
++    }
++
++#ifdef SSL_ERROR_PENDING_SESSION
++    if (sslerr == SSL_ERROR_PENDING_SESSION) {
++        c->read->handler = ngx_ssl_handshake_handler;
++        c->write->handler = ngx_ssl_handshake_handler;
++
++        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        return NGX_AGAIN;
++    }
++#endif
++
++#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
++    if (sslerr == SSL_ERROR_WANT_CLIENT_HELLO_CB) {
++        c->read->handler = ngx_ssl_handshake_handler;
++        c->write->handler = ngx_ssl_handshake_handler;
++
++        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
++            return NGX_ERROR;
++        }
++
++        return NGX_AGAIN;
++    }
++#endif
+ 
+     err = (sslerr == SSL_ERROR_SYSCALL) ? ngx_errno : 0;
+ 
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_posted.c ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_posted.c
+--- bundle/nginx-1.25.1/src/event/ngx_event_posted.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_posted.c	2023-07-06 16:49:43.000000000 +0800
+@@ -13,7 +13,7 @@
+ ngx_queue_t  ngx_posted_accept_events;
+ ngx_queue_t  ngx_posted_next_events;
+ ngx_queue_t  ngx_posted_events;
+-
++ngx_queue_t  ngx_posted_delayed_events;
+ 
+ void
+ ngx_event_process_posted(ngx_cycle_t *cycle, ngx_queue_t *posted)
+diff -uNr bundle/nginx-1.25.1/src/event/ngx_event_posted.h ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_posted.h
+--- bundle/nginx-1.25.1/src/event/ngx_event_posted.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/event/ngx_event_posted.h	2023-07-06 16:50:38.000000000 +0800
+@@ -45,6 +45,8 @@
+ extern ngx_queue_t  ngx_posted_accept_events;
+ extern ngx_queue_t  ngx_posted_next_events;
+ extern ngx_queue_t  ngx_posted_events;
++extern ngx_queue_t  ngx_posted_delayed_events;
+ 
++#define HAVE_POSTED_DELAYED_EVENTS_PATCH
+ 
+ #endif /* _NGX_EVENT_POSTED_H_INCLUDED_ */
+diff -uNr bundle/nginx-1.25.1/src/http/modules/ngx_http_log_module.c ngx_pr/bundle/nginx-1.25.1/src/http/modules/ngx_http_log_module.c
+--- bundle/nginx-1.25.1/src/http/modules/ngx_http_log_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/modules/ngx_http_log_module.c	2023-07-06 17:05:33.000000000 +0800
+@@ -79,6 +79,8 @@
+     time_t                      open_file_cache_valid;
+     ngx_uint_t                  open_file_cache_min_uses;
+ 
++    ngx_flag_t                  escape_non_ascii;
++
+     ngx_uint_t                  off;        /* unsigned  off:1 */
+ } ngx_http_log_loc_conf_t;
+ 
+@@ -136,7 +138,8 @@
+     uintptr_t data);
+ static u_char *ngx_http_log_variable(ngx_http_request_t *r, u_char *buf,
+     ngx_http_log_op_t *op);
+-static uintptr_t ngx_http_log_escape(u_char *dst, u_char *src, size_t size);
++static uintptr_t ngx_http_log_escape(ngx_http_log_loc_conf_t *lcf, u_char *dst,
++    u_char *src, size_t size);
+ static size_t ngx_http_log_json_variable_getlen(ngx_http_request_t *r,
+     uintptr_t data);
+ static u_char *ngx_http_log_json_variable(ngx_http_request_t *r, u_char *buf,
+@@ -186,6 +189,13 @@
+       0,
+       NULL },
+ 
++    { ngx_string("log_escape_non_ascii"),
++      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
++      ngx_conf_set_flag_slot,
++      NGX_HTTP_LOC_CONF_OFFSET,
++      offsetof(ngx_http_log_loc_conf_t, escape_non_ascii),
++      NULL },
++
+       ngx_null_command
+ };
+ 
+@@ -951,6 +961,7 @@
+ ngx_http_log_variable_getlen(ngx_http_request_t *r, uintptr_t data)
+ {
+     uintptr_t                   len;
++    ngx_http_log_loc_conf_t    *lcf;
+     ngx_http_variable_value_t  *value;
+ 
+     value = ngx_http_get_indexed_variable(r, data);
+@@ -959,7 +970,9 @@
+         return 1;
+     }
+ 
+-    len = ngx_http_log_escape(NULL, value->data, value->len);
++    lcf = ngx_http_get_module_loc_conf(r, ngx_http_log_module);
++
++    len = ngx_http_log_escape(lcf, NULL, value->data, value->len);
+ 
+     value->escape = len ? 1 : 0;
+ 
+@@ -970,6 +983,7 @@
+ static u_char *
+ ngx_http_log_variable(ngx_http_request_t *r, u_char *buf, ngx_http_log_op_t *op)
+ {
++    ngx_http_log_loc_conf_t    *lcf;
+     ngx_http_variable_value_t  *value;
+ 
+     value = ngx_http_get_indexed_variable(r, op->data);
+@@ -983,13 +997,15 @@
+         return ngx_cpymem(buf, value->data, value->len);
+ 
+     } else {
+-        return (u_char *) ngx_http_log_escape(buf, value->data, value->len);
++        lcf = ngx_http_get_module_loc_conf(r, ngx_http_log_module);
++        return (u_char *) ngx_http_log_escape(lcf, buf, value->data, value->len);
+     }
+ }
+ 
+ 
+ static uintptr_t
+-ngx_http_log_escape(u_char *dst, u_char *src, size_t size)
++ngx_http_log_escape(ngx_http_log_loc_conf_t *lcf, u_char *dst, u_char *src,
++    size_t size)
+ {
+     ngx_uint_t      n;
+     static u_char   hex[] = "0123456789ABCDEF";
+@@ -1012,6 +1028,12 @@
+         0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+     };
+ 
++    if (lcf->escape_non_ascii) {
++        ngx_memset(&escape[4], 0xff, sizeof(uint32_t) * 4);
++
++    } else {
++        ngx_memzero(&escape[4], sizeof(uint32_t) * 4);
++    }
+ 
+     if (dst == NULL) {
+ 
+@@ -1169,6 +1191,7 @@
+     }
+ 
+     conf->open_file_cache = NGX_CONF_UNSET_PTR;
++    conf->escape_non_ascii = NGX_CONF_UNSET;
+ 
+     return conf;
+ }
+@@ -1184,6 +1207,8 @@
+     ngx_http_log_fmt_t        *fmt;
+     ngx_http_log_main_conf_t  *lmcf;
+ 
++    ngx_conf_merge_value(conf->escape_non_ascii, prev->escape_non_ascii, 1);
++
+     if (conf->open_file_cache == NGX_CONF_UNSET_PTR) {
+ 
+         conf->open_file_cache = prev->open_file_cache;
+diff -uNr bundle/nginx-1.25.1/src/http/modules/ngx_http_proxy_module.c ngx_pr/bundle/nginx-1.25.1/src/http/modules/ngx_http_proxy_module.c
+--- bundle/nginx-1.25.1/src/http/modules/ngx_http_proxy_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/modules/ngx_http_proxy_module.c	2023-07-07 14:59:01.000000000 +0800
+@@ -872,13 +872,13 @@
+ static ngx_http_variable_t  ngx_http_proxy_vars[] = {
+ 
+     { ngx_string("proxy_host"), NULL, ngx_http_proxy_host_variable, 0,
+-      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
++      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE, 0 },
+ 
+     { ngx_string("proxy_port"), NULL, ngx_http_proxy_port_variable, 0,
+-      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
++      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE, 0 },
+ 
+     { ngx_string("proxy_add_x_forwarded_for"), NULL,
+-      ngx_http_proxy_add_x_forwarded_for_variable, 0, NGX_HTTP_VAR_NOHASH, 0 },
++      ngx_http_proxy_add_x_forwarded_for_variable, 0, 0, 0 },
+ 
+ #if 0
+     { ngx_string("proxy_add_via"), NULL, NULL, 0, NGX_HTTP_VAR_NOHASH, 0 },
+diff -uNr bundle/nginx-1.25.1/src/http/ngx_http_core_module.c ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_core_module.c
+--- bundle/nginx-1.25.1/src/http/ngx_http_core_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_core_module.c	2023-07-06 17:23:10.000000000 +0800
+@@ -64,6 +64,8 @@
+     void *conf);
+ static char *ngx_http_core_error_page(ngx_conf_t *cf, ngx_command_t *cmd,
+     void *conf);
++static char *ngx_http_core_no_error_pages(ngx_conf_t *cf, ngx_command_t *cmd,
++    void *conf);
+ static char *ngx_http_core_open_file_cache(ngx_conf_t *cf, ngx_command_t *cmd,
+     void *conf);
+ static char *ngx_http_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd,
+@@ -671,6 +673,14 @@
+       0,
+       NULL },
+ 
++    { ngx_string("no_error_pages"),
++      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
++                        |NGX_CONF_NOARGS,
++      ngx_http_core_no_error_pages,
++      NGX_HTTP_LOC_CONF_OFFSET,
++      0,
++      NULL },
++
+     { ngx_string("post_action"),
+       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF
+                         |NGX_CONF_TAKE1,
+@@ -3564,7 +3574,6 @@
+      *     clcf->types = NULL;
+      *     clcf->default_type = { 0, NULL };
+      *     clcf->error_log = NULL;
+-     *     clcf->error_pages = NULL;
+      *     clcf->client_body_path = NULL;
+      *     clcf->regex = NULL;
+      *     clcf->exact_match = 0;
+@@ -3574,6 +3583,7 @@
+      *     clcf->keepalive_disable = 0;
+      */
+ 
++    clcf->error_pages = NGX_CONF_UNSET_PTR;
+     clcf->client_max_body_size = NGX_CONF_UNSET;
+     clcf->client_body_buffer_size = NGX_CONF_UNSET_SIZE;
+     clcf->client_body_timeout = NGX_CONF_UNSET_MSEC;
+@@ -3776,9 +3786,7 @@
+         }
+     }
+ 
+-    if (conf->error_pages == NULL && prev->error_pages) {
+-        conf->error_pages = prev->error_pages;
+-    }
++    ngx_conf_merge_ptr_value(conf->error_pages, prev->error_pages, NULL);
+ 
+     ngx_conf_merge_str_value(conf->default_type,
+                               prev->default_type, "text/plain");
+@@ -4815,6 +4823,10 @@
+     ngx_http_compile_complex_value_t   ccv;
+ 
+     if (clcf->error_pages == NULL) {
++        return "conflicts with \"no_error_pages\"";
++    }
++
++    if (clcf->error_pages == NGX_CONF_UNSET_PTR) {
+         clcf->error_pages = ngx_array_create(cf->pool, 4,
+                                              sizeof(ngx_http_err_page_t));
+         if (clcf->error_pages == NULL) {
+@@ -4918,6 +4930,25 @@
+ 
+     return NGX_CONF_OK;
+ }
++
++
++static char *
++ngx_http_core_no_error_pages(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
++{
++    ngx_http_core_loc_conf_t *clcf = conf;
++
++    if (clcf->error_pages == NULL) {
++        return "is duplicate";
++    }
++
++    if (clcf->error_pages != NGX_CONF_UNSET_PTR) {
++        return "conflicts with \"error_page\"";
++    }
++
++    clcf->error_pages = NULL;
++
++    return NGX_CONF_OK;
++}
+ 
+ 
+ static char *
+diff -uNr bundle/nginx-1.25.1/src/http/ngx_http_header_filter_module.c ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_header_filter_module.c
+--- bundle/nginx-1.25.1/src/http/ngx_http_header_filter_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_header_filter_module.c	2023-07-06 17:24:28.000000000 +0800
+@@ -46,7 +46,7 @@
+ };
+ 
+ 
+-static u_char ngx_http_server_string[] = "Server: nginx" CRLF;
++static u_char ngx_http_server_string[] = "Server: openresty" CRLF;
+ static u_char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
+ static u_char ngx_http_server_build_string[] = "Server: " NGINX_VER_BUILD CRLF;
+ 
+diff -uNr bundle/nginx-1.25.1/src/http/ngx_http_special_response.c ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_special_response.c
+--- bundle/nginx-1.25.1/src/http/ngx_http_special_response.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_special_response.c	2023-07-06 17:25:01.000000000 +0800
+@@ -33,7 +33,7 @@
+ 
+ 
+ static u_char ngx_http_error_tail[] =
+-"<hr><center>nginx</center>" CRLF
++"<hr><center>openresty</center>" CRLF
+ "</body>" CRLF
+ "</html>" CRLF
+ ;
+diff -uNr bundle/nginx-1.25.1/src/http/ngx_http_upstream.c ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_upstream.c
+--- bundle/nginx-1.25.1/src/http/ngx_http_upstream.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_upstream.c	2023-07-07 14:58:51.000000000 +0800
+@@ -508,12 +508,19 @@
+ ngx_http_upstream_init(ngx_http_request_t *r)
+ {
+     ngx_connection_t     *c;
++    ngx_http_upstream_t  *u;
+ 
+     c = r->connection;
+ 
+     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                    "http init upstream, client timer: %d", c->read->timer_set);
+ 
++    u = r->upstream;
++
++    u->connect_timeout = u->conf->connect_timeout;
++    u->send_timeout = u->conf->send_timeout;
++    u->read_timeout = u->conf->read_timeout;
++
+ #if (NGX_HTTP_V2)
+     if (r->stream) {
+         ngx_http_upstream_init_request(r);
+@@ -1563,6 +1570,11 @@
+         return;
+     }
+ 
++    if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
++        ngx_http_upstream_finalize_request(r, u, rc);
++        return;
++    }
++
+     u->state->peer = u->peer.name;
+ 
+     if (rc == NGX_BUSY) {
+@@ -1662,7 +1674,7 @@
+     u->request_body_blocked = 0;
+ 
+     if (rc == NGX_AGAIN) {
+-        ngx_add_timer(c->write, u->conf->connect_timeout);
++        ngx_add_timer(c->write, u->connect_timeout);
+         return;
+     }
+ 
+@@ -1749,7 +1761,7 @@
+     if (rc == NGX_AGAIN) {
+ 
+         if (!c->write->timer_set) {
+-            ngx_add_timer(c->write, u->conf->connect_timeout);
++            ngx_add_timer(c->write, u->connect_timeout);
+         }
+ 
+         c->ssl->handler = ngx_http_upstream_ssl_handshake_handler;
+@@ -2112,7 +2124,7 @@
+ 
+     if (rc == NGX_AGAIN) {
+         if (!c->write->ready || u->request_body_blocked) {
+-            ngx_add_timer(c->write, u->conf->send_timeout);
++            ngx_add_timer(c->write, u->send_timeout);
+ 
+         } else if (c->write->timer_set) {
+             ngx_del_timer(c->write);
+@@ -2178,7 +2190,7 @@
+             return;
+         }
+ 
+-        ngx_add_timer(c->read, u->conf->read_timeout);
++        ngx_add_timer(c->read, u->read_timeout);
+ 
+         if (c->read->ready) {
+             ngx_http_upstream_process_header(r, u);
+@@ -2333,7 +2345,7 @@
+ 
+ #endif
+ 
+-    if (u->header_sent && !u->conf->preserve_output) {
++    if (u->request_body_sent && !u->conf->preserve_output) {
+         u->write_event_handler = ngx_http_upstream_dummy_handler;
+ 
+         (void) ngx_handle_write_event(c->write, 0);
+@@ -3333,7 +3345,7 @@
+         p->cyclic_temp_file = 0;
+     }
+ 
+-    p->read_timeout = u->conf->read_timeout;
++    p->read_timeout = u->read_timeout;
+     p->send_timeout = clcf->send_timeout;
+     p->send_lowat = clcf->send_lowat;
+ 
+@@ -3579,7 +3591,7 @@
+     }
+ 
+     if (upstream->write->active && !upstream->write->ready) {
+-        ngx_add_timer(upstream->write, u->conf->send_timeout);
++        ngx_add_timer(upstream->write, u->send_timeout);
+ 
+     } else if (upstream->write->timer_set) {
+         ngx_del_timer(upstream->write);
+@@ -3598,7 +3610,7 @@
+     }
+ 
+     if (upstream->read->active && !upstream->read->ready) {
+-        ngx_add_timer(upstream->read, u->conf->read_timeout);
++        ngx_add_timer(upstream->read, u->read_timeout);
+ 
+     } else if (upstream->read->timer_set) {
+         ngx_del_timer(upstream->read);
+@@ -3807,7 +3819,7 @@
+     }
+ 
+     if (upstream->read->active && !upstream->read->ready) {
+-        ngx_add_timer(upstream->read, u->conf->read_timeout);
++        ngx_add_timer(upstream->read, u->read_timeout);
+ 
+     } else if (upstream->read->timer_set) {
+         ngx_del_timer(upstream->read);
+diff -uNr bundle/nginx-1.25.1/src/http/ngx_http_upstream.h ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_upstream.h
+--- bundle/nginx-1.25.1/src/http/ngx_http_upstream.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/ngx_http_upstream.h	2023-07-06 17:44:11.000000000 +0800
+@@ -337,6 +337,11 @@
+     ngx_array_t                     *caches;
+ #endif
+ 
++#define HAVE_NGX_UPSTREAM_TIMEOUT_FIELDS  1
++    ngx_msec_t                       connect_timeout;
++    ngx_msec_t                       send_timeout;
++    ngx_msec_t                       read_timeout;
++    
+     ngx_http_upstream_headers_in_t   headers_in;
+ 
+     ngx_http_upstream_resolved_t    *resolved;
+diff -uNr bundle/nginx-1.25.1/src/http/v2/ngx_http_v2_filter_module.c ngx_pr/bundle/nginx-1.25.1/src/http/v2/ngx_http_v2_filter_module.c
+--- bundle/nginx-1.25.1/src/http/v2/ngx_http_v2_filter_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/http/v2/ngx_http_v2_filter_module.c	2023-07-06 17:46:35.000000000 +0800
+@@ -115,7 +115,7 @@
+     ngx_http_core_srv_conf_t  *cscf;
+     u_char                     addr[NGX_SOCKADDR_STRLEN];
+ 
+-    static const u_char nginx[5] = "\x84\xaa\x63\x55\xe7";
++    static const u_char nginx[8] = "\x87\x3d\x65\xaa\xc2\xa1\x3e\xbf";
+ #if (NGX_HTTP_GZIP)
+     static const u_char accept_encoding[12] =
+         "\x8b\x84\x84\x2d\x69\x5b\x05\x44\x3c\x86\xaa\x6f";
+diff -uNr bundle/nginx-1.25.1/src/os/unix/ngx_daemon.c ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_daemon.c
+--- bundle/nginx-1.25.1/src/os/unix/ngx_daemon.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_daemon.c	2023-07-06 17:49:02.000000000 +0800
+@@ -23,6 +23,8 @@
+         break;
+ 
+     default:
++        /* just to make it ASAN or Valgrind clean */
++        ngx_destroy_pool(ngx_cycle->pool);
+         exit(0);
+     }
+ 
+diff -uNr bundle/nginx-1.25.1/src/os/unix/ngx_process.c ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_process.c
+--- bundle/nginx-1.25.1/src/os/unix/ngx_process.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_process.c	2023-07-06 17:52:01.000000000 +0800
+@@ -362,8 +362,15 @@
+             break;
+ 
+         case ngx_signal_value(NGX_RECONFIGURE_SIGNAL):
+-            ngx_reconfigure = 1;
+-            action = ", reconfiguring";
++            if (ngx_process == NGX_PROCESS_SINGLE) {
++                ngx_terminate = 1;
++                action = ", exiting";
++
++            } else {
++                ngx_reconfigure = 1;
++                action = ", reconfiguring";
++            }
++            
+             break;
+ 
+         case ngx_signal_value(NGX_REOPEN_SIGNAL):
+diff -uNr bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.c ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.c
+--- bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.c	2023-07-06 18:14:25.000000000 +0800
+@@ -15,6 +15,8 @@
+     ngx_int_t type);
+ static void ngx_start_cache_manager_processes(ngx_cycle_t *cycle,
+     ngx_uint_t respawn);
++static void ngx_start_privileged_agent_processes(ngx_cycle_t *cycle,
++    ngx_uint_t respawn);
+ static void ngx_pass_open_channel(ngx_cycle_t *cycle);
+ static void ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo);
+ static ngx_uint_t ngx_reap_children(ngx_cycle_t *cycle);
+@@ -24,6 +26,7 @@
+ static void ngx_worker_process_exit(ngx_cycle_t *cycle);
+ static void ngx_channel_handler(ngx_event_t *ev);
+ static void ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data);
++static void ngx_privileged_agent_process_cycle(ngx_cycle_t *cycle, void *data);
+ static void ngx_cache_manager_process_handler(ngx_event_t *ev);
+ static void ngx_cache_loader_process_handler(ngx_event_t *ev);
+ 
+@@ -52,6 +55,7 @@
+ ngx_uint_t    ngx_noaccepting;
+ ngx_uint_t    ngx_restart;
+ 
++ngx_uint_t    ngx_is_privileged_agent;
+ 
+ static u_char  master_process[] = "master process";
+ 
+@@ -130,6 +134,7 @@
+     ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                NGX_PROCESS_RESPAWN);
+     ngx_start_cache_manager_processes(cycle, 0);
++    ngx_start_privileged_agent_processes(cycle, 0);
+ 
+     ngx_new_binary = 0;
+     delay = 0;
+@@ -215,6 +220,7 @@
+                 ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                            NGX_PROCESS_RESPAWN);
+                 ngx_start_cache_manager_processes(cycle, 0);
++                ngx_start_privileged_agent_processes(cycle, 0);
+                 ngx_noaccepting = 0;
+ 
+                 continue;
+@@ -234,6 +240,7 @@
+             ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                        NGX_PROCESS_JUST_RESPAWN);
+             ngx_start_cache_manager_processes(cycle, 1);
++            ngx_start_privileged_agent_processes(cycle, 1);
+ 
+             /* allow new processes to start */
+             ngx_msleep(100);
+@@ -248,6 +255,7 @@
+             ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                        NGX_PROCESS_RESPAWN);
+             ngx_start_cache_manager_processes(cycle, 0);
++            ngx_start_privileged_agent_processes(cycle, 0);
+             live = 1;
+         }
+ 
+@@ -295,11 +303,26 @@
+     }
+ 
+     for ( ;; ) {
++        if (ngx_exiting) {
++            if (ngx_event_no_timers_left() == NGX_OK) {
++                ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
++
++                for (i = 0; cycle->modules[i]; i++) {
++                    if (cycle->modules[i]->exit_process) {
++                        cycle->modules[i]->exit_process(cycle);
++                    }
++                }
++
++                ngx_master_process_exit(cycle);
++            }
++        }
++
+         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
+ 
+         ngx_process_events_and_timers(cycle);
+ 
+-        if (ngx_terminate || ngx_quit) {
++        if (ngx_terminate) {
++            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
+ 
+             for (i = 0; cycle->modules[i]; i++) {
+                 if (cycle->modules[i]->exit_process) {
+@@ -310,6 +333,20 @@
+             ngx_master_process_exit(cycle);
+         }
+ 
++        if (ngx_quit) {
++            ngx_quit = 0;
++            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
++                          "gracefully shutting down");
++            ngx_setproctitle("process is shutting down");
++
++            if (!ngx_exiting) {
++                ngx_exiting = 1;
++                ngx_set_shutdown_timer(cycle);
++                ngx_close_listening_sockets(cycle);
++                ngx_close_idle_connections(cycle);
++            }
++        }
++
+         if (ngx_reconfigure) {
+             ngx_reconfigure = 0;
+             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+@@ -393,6 +430,35 @@
+ 
+ 
+ static void
++ngx_start_privileged_agent_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
++{
++    ngx_core_conf_t       *ccf;
++
++    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
++                                           ngx_core_module);
++
++    if (!ccf->privileged_agent) {
++        return;
++    }
++
++    /* 0 is an illegal value and may result in a core dump later */
++    if (ccf->privileged_agent_connections == 0) {
++        ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
++                      "%ui worker_connection is not enough, "
++                      "privileged agent process cannot be spawned",
++                      ccf->privileged_agent_connections);
++        return;
++    }
++
++    ngx_spawn_process(cycle, ngx_privileged_agent_process_cycle,
++                      "privileged agent process", "privileged agent process",
++                      respawn ? NGX_PROCESS_JUST_RESPAWN : NGX_PROCESS_RESPAWN);
++
++    ngx_pass_open_channel(cycle);
++}
++
++
++static void
+ ngx_pass_open_channel(ngx_cycle_t *cycle)
+ {
+     ngx_int_t      i;
+@@ -689,6 +755,11 @@
+     ngx_exit_cycle.files_n = ngx_cycle->files_n;
+     ngx_cycle = &ngx_exit_cycle;
+ 
++    if (saved_init_cycle_pool != NULL && saved_init_cycle_pool != cycle->pool) {
++        ngx_destroy_pool(saved_init_cycle_pool);
++        saved_init_cycle_pool = NULL;
++    }
++
+     ngx_destroy_pool(cycle->pool);
+ 
+     exit(0);
+@@ -796,7 +867,10 @@
+         }
+     }
+ 
+-    if (geteuid() == 0) {
++    /*
++     * privileged agent process has the same permission as master process
++     */
++    if (!ngx_is_privileged_agent && geteuid() == 0) {
+         if (setgid(ccf->group) == -1) {
+             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                           "setgid(%d) failed", ccf->group);
+@@ -953,6 +1027,9 @@
+         for (i = 0; i < cycle->connection_n; i++) {
+             if (c[i].fd != -1
+                 && c[i].read
++#if (HAVE_SOCKET_CLOEXEC_PATCH)
++                && !c[i].read->skip_socket_leak_check
++#endif
+                 && !c[i].read->accept
+                 && !c[i].read->channel
+                 && !c[i].read->resolver)
+@@ -1122,7 +1199,49 @@
+ 
+         if (ngx_terminate || ngx_quit) {
+             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
+-            exit(0);
++            ngx_worker_process_exit(cycle);
++        }
++
++        if (ngx_reopen) {
++            ngx_reopen = 0;
++            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
++            ngx_reopen_files(cycle, -1);
++        }
++
++        ngx_process_events_and_timers(cycle);
++    }
++}
++
++
++static void
++ngx_privileged_agent_process_cycle(ngx_cycle_t *cycle, void *data)
++{
++    char   *name = data;
++    ngx_core_conf_t *ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
++
++    /*
++     * Set correct process type since closing listening Unix domain socket
++     * in a master process also removes the Unix domain socket file.
++     */
++    ngx_process = NGX_PROCESS_HELPER;
++    ngx_is_privileged_agent = 1;
++
++    ngx_close_listening_sockets(cycle);
++
++    /* Set a moderate number of connections for a helper process. */
++    cycle->connection_n = ccf->privileged_agent_connections;
++
++    ngx_worker_process_init(cycle, -1);
++
++    ngx_use_accept_mutex = 0;
++
++    ngx_setproctitle(name);
++
++    for ( ;; ) {
++
++        if (ngx_terminate || ngx_quit) {
++            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
++            ngx_worker_process_exit(cycle);
+         }
+ 
+         if (ngx_reopen) {
+diff -uNr bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.h ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.h
+--- bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_process_cycle.h	2023-07-06 18:15:49.000000000 +0800
+@@ -45,6 +45,7 @@
+ extern ngx_uint_t      ngx_inherited;
+ extern ngx_uint_t      ngx_daemonized;
+ extern ngx_uint_t      ngx_exiting;
++extern ngx_uint_t      ngx_is_privileged_agent;
+ 
+ extern sig_atomic_t    ngx_reap;
+ extern sig_atomic_t    ngx_sigio;
+diff -uNr bundle/nginx-1.25.1/src/os/unix/ngx_socket.h ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_socket.h
+--- bundle/nginx-1.25.1/src/os/unix/ngx_socket.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/os/unix/ngx_socket.h	2023-07-06 18:17:08.000000000 +0800
+@@ -47,6 +47,17 @@
+ 
+ #endif
+ 
++#if (NGX_HAVE_FD_CLOEXEC)
++
++#define ngx_cloexec(s)      fcntl(s, F_SETFD, FD_CLOEXEC)
++#define ngx_cloexec_n       "fcntl(FD_CLOEXEC)"
++
++/* at least FD_CLOEXEC is required to ensure connection fd is closed
++ * after execve */
++#define HAVE_SOCKET_CLOEXEC_PATCH  1
++
++#endif
++
+ int ngx_tcp_nopush(ngx_socket_t s);
+ int ngx_tcp_push(ngx_socket_t s);
+ 
+diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream.h ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream.h
+--- bundle/nginx-1.25.1/src/stream/ngx_stream.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream.h	2023-07-06 18:21:10.000000000 +0800
+@@ -28,6 +28,7 @@
+ 
+ #define NGX_STREAM_OK                        200
+ #define NGX_STREAM_BAD_REQUEST               400
++#define NGX_STREAM_SPECIAL_RESPONSE          300
+ #define NGX_STREAM_FORBIDDEN                 403
+ #define NGX_STREAM_INTERNAL_SERVER_ERROR     500
+ #define NGX_STREAM_BAD_GATEWAY               502
+@@ -247,6 +248,15 @@
+ } ngx_stream_module_t;
+ 
+ 
++typedef struct {
++    ngx_msec_t                       connect_timeout;
++    ngx_msec_t                       timeout;
++} ngx_stream_proxy_ctx_t;
++
++
++#define NGX_STREAM_HAVE_PROXY_TIMEOUT_FIELDS_PATCH 1
++
++
+ #define NGX_STREAM_MODULE       0x4d525453     /* "STRM" */
+ 
+ #define NGX_STREAM_MAIN_CONF    0x02000000
+@@ -300,6 +310,7 @@
+ extern ngx_module_t  ngx_stream_module;
+ extern ngx_uint_t    ngx_stream_max_module;
+ extern ngx_module_t  ngx_stream_core_module;
++extern ngx_module_t  ngx_stream_proxy_module;
+ 
+ 
+ typedef ngx_int_t (*ngx_stream_filter_pt)(ngx_stream_session_t *s,
+@@ -309,4 +320,7 @@
+ extern ngx_stream_filter_pt  ngx_stream_top_filter;
+ 
+ 
++#define HAS_NGX_STREAM_PROXY_GET_NEXT_UPSTREAM_TRIES_PATCH 1
++
++
+ #endif /* _NGX_STREAM_H_INCLUDED_ */
+diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream_proxy_module.c ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_proxy_module.c
+--- bundle/nginx-1.25.1/src/stream/ngx_stream_proxy_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_proxy_module.c	2023-07-06 18:38:47.000000000 +0800
+@@ -402,6 +402,7 @@
+     ngx_stream_proxy_srv_conf_t      *pscf;
+     ngx_stream_upstream_srv_conf_t   *uscf, **uscfp;
+     ngx_stream_upstream_main_conf_t  *umcf;
++    ngx_stream_proxy_ctx_t           *pctx;
+ 
+     c = s->connection;
+ 
+@@ -409,6 +410,17 @@
+ 
+     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
+                    "proxy connection handler");
++    
++    pctx = ngx_palloc(c->pool, sizeof(ngx_stream_proxy_ctx_t));
++    if (pctx == NULL) {
++        ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
++        return;
++    }
++
++    pctx->connect_timeout = pscf->connect_timeout;
++    pctx->timeout = pscf->timeout;
++
++    ngx_stream_set_ctx(s, pctx, ngx_stream_proxy_module);
+ 
+     u = ngx_pcalloc(c->pool, sizeof(ngx_stream_upstream_t));
+     if (u == NULL) {
+@@ -701,6 +713,7 @@
+     ngx_connection_t             *c, *pc;
+     ngx_stream_upstream_t        *u;
+     ngx_stream_proxy_srv_conf_t  *pscf;
++    ngx_stream_proxy_ctx_t       *ctx;
+ 
+     c = s->connection;
+ 
+@@ -708,6 +721,8 @@
+ 
+     pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_proxy_module);
+ 
++    ctx = ngx_stream_get_module_ctx(s, ngx_stream_proxy_module);
++
+     u = s->upstream;
+ 
+     u->connected = 0;
+@@ -740,6 +755,11 @@
+         return;
+     }
+ 
++    if (rc >= NGX_STREAM_SPECIAL_RESPONSE) {
++        ngx_stream_proxy_finalize(s, rc);
++        return;
++    }
++
+     u->state->peer = u->peer.name;
+ 
+     if (rc == NGX_BUSY) {
+@@ -771,7 +791,7 @@
+     pc->read->handler = ngx_stream_proxy_connect_handler;
+     pc->write->handler = ngx_stream_proxy_connect_handler;
+ 
+-    ngx_add_timer(pc->write, pscf->connect_timeout);
++    ngx_add_timer(pc->write, ctx->connect_timeout);
+ }
+ 
+ 
+@@ -946,9 +966,11 @@
+     ssize_t                       n, size;
+     ngx_connection_t             *c, *pc;
+     ngx_stream_upstream_t        *u;
+-    ngx_stream_proxy_srv_conf_t  *pscf;
++    ngx_stream_proxy_ctx_t       *ctx;
+     u_char                        buf[NGX_PROXY_PROTOCOL_V1_MAX_HEADER];
+ 
++    ctx = ngx_stream_get_module_ctx(s, ngx_stream_proxy_module);
++
+     c = s->connection;
+ 
+     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
+@@ -975,9 +997,7 @@
+             return NGX_ERROR;
+         }
+ 
+-        pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_proxy_module);
+-
+-        ngx_add_timer(pc->write, pscf->timeout);
++        ngx_add_timer(pc->write, ctx->timeout);
+ 
+         pc->write->handler = ngx_stream_proxy_connect_handler;
+ 
+@@ -1052,6 +1072,9 @@
+     ngx_connection_t             *pc;
+     ngx_stream_upstream_t        *u;
+     ngx_stream_proxy_srv_conf_t  *pscf;
++    ngx_stream_proxy_ctx_t       *ctx;
++
++    ctx = ngx_stream_get_module_ctx(s, ngx_stream_proxy_module);
+ 
+     u = s->upstream;
+ 
+@@ -1100,7 +1123,7 @@
+     if (rc == NGX_AGAIN) {
+ 
+         if (!pc->write->timer_set) {
+-            ngx_add_timer(pc->write, pscf->connect_timeout);
++            ngx_add_timer(pc->write, ctx->connect_timeout);
+         }
+ 
+         pc->ssl->handler = ngx_stream_proxy_ssl_handshake;
+@@ -1409,6 +1432,7 @@
+     ngx_stream_session_t         *s;
+     ngx_stream_upstream_t        *u;
+     ngx_stream_proxy_srv_conf_t  *pscf;
++    ngx_stream_proxy_ctx_t       *ctx;
+ 
+     c = ev->data;
+     s = c->data;
+@@ -1420,6 +1444,8 @@
+         return;
+     }
+ 
++    ctx = ngx_stream_get_module_ctx(s, ngx_stream_proxy_module);
++
+     c = s->connection;
+     pc = u->peer.connection;
+ 
+@@ -1439,7 +1465,7 @@
+                 }
+ 
+                 if (u->connected && !c->read->delayed && !pc->read->delayed) {
+-                    ngx_add_timer(c->write, pscf->timeout);
++                    ngx_add_timer(c->write, ctx->timeout);
+                 }
+ 
+                 return;
+@@ -1601,6 +1627,9 @@
+     ngx_log_handler_pt            handler;
+     ngx_stream_upstream_t        *u;
+     ngx_stream_proxy_srv_conf_t  *pscf;
++    ngx_stream_proxy_ctx_t       *ctx;
++
++    ctx = ngx_stream_get_module_ctx(s, ngx_stream_proxy_module);
+ 
+     u = s->upstream;
+ 
+@@ -1792,7 +1821,7 @@
+         }
+ 
+         if (!c->read->delayed && !pc->read->delayed) {
+-            ngx_add_timer(c->write, pscf->timeout);
++            ngx_add_timer(c->write, ctx->timeout);
+ 
+         } else if (c->write->timer_set) {
+             ngx_del_timer(c->write);
+@@ -2505,3 +2534,14 @@
+ 
+     return NGX_CONF_OK;
+ }
++
++
++ngx_uint_t
++ngx_stream_proxy_get_next_upstream_tries(ngx_stream_session_t *s)
++{
++    ngx_stream_proxy_srv_conf_t      *pscf;
++
++    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_proxy_module);
++
++    return pscf->next_upstream_tries;
++}
+diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream_ssl_preread_module.c ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_ssl_preread_module.c
+--- bundle/nginx-1.25.1/src/stream/ngx_stream_ssl_preread_module.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_ssl_preread_module.c	2023-07-06 18:40:11.000000000 +0800
+@@ -188,7 +188,7 @@
+         }
+ 
+         if (rc != NGX_AGAIN) {
+-            return rc;
++            return rc == NGX_OK ? NGX_DECLINED : rc;
+         }
+ 
+         p += len;
+diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream_upstream.h ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_upstream.h
+--- bundle/nginx-1.25.1/src/stream/ngx_stream_upstream.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_upstream.h	2023-07-06 18:41:09.000000000 +0800
+@@ -157,4 +157,9 @@
+ extern ngx_module_t  ngx_stream_upstream_module;
+ 
+ 
++#ifndef HAVE_BALANCER_STATUS_CODE_PATCH
++#define HAVE_BALANCER_STATUS_CODE_PATCH
++#endif
++
++
+ #endif /* _NGX_STREAM_UPSTREAM_H_INCLUDED_ */
+diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.c ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.c
+--- bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.c	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.c	2023-07-06 18:45:33.000000000 +0800
+@@ -21,10 +21,6 @@
+ 
+ #if (NGX_STREAM_SSL)
+ 
+-static ngx_int_t ngx_stream_upstream_set_round_robin_peer_session(
+-    ngx_peer_connection_t *pc, void *data);
+-static void ngx_stream_upstream_save_round_robin_peer_session(
+-    ngx_peer_connection_t *pc, void *data);
+ static ngx_int_t ngx_stream_upstream_empty_set_session(
+     ngx_peer_connection_t *pc, void *data);
+ static void ngx_stream_upstream_empty_save_session(ngx_peer_connection_t *pc,
+@@ -704,7 +700,7 @@
+ 
+ #if (NGX_STREAM_SSL)
+ 
+-static ngx_int_t
++ngx_int_t
+ ngx_stream_upstream_set_round_robin_peer_session(ngx_peer_connection_t *pc,
+     void *data)
+ {
+@@ -767,7 +767,7 @@
+ }
+ 
+ 
+-static void
++void
+ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
+     void *data)
+ {
+diff -uNr bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.h ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.h
+--- bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.h	2023-06-13 23:08:10.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/src/stream/ngx_stream_upstream_round_robin.h	2023-07-06 18:43:54.000000000 +0800
+@@ -143,5 +143,15 @@
+ void ngx_stream_upstream_free_round_robin_peer(ngx_peer_connection_t *pc,
+     void *data, ngx_uint_t state);
+ 
++#if (NGX_STREAM_SSL)
++ngx_int_t ngx_stream_upstream_set_round_robin_peer_session(
++    ngx_peer_connection_t *pc, void *data);
++void ngx_stream_upstream_save_round_robin_peer_session(
++    ngx_peer_connection_t *pc, void *data);
++#endif
++
++
++#define HAVE_NGX_STREAM_BALANCER_EXPORT_PATCH 1
++
+ 
+ #endif /* _NGX_STREAM_UPSTREAM_ROUND_ROBIN_H_INCLUDED_ */
+diff -uNr bundle/nginx-1.25.1/.vscode/settings.json ngx_pr/bundle/nginx-1.25.1/.vscode/settings.json
+--- bundle/nginx-1.25.1/.vscode/settings.json	1970-01-01 08:00:00.000000000 +0800
++++ ngx_pr/bundle/nginx-1.25.1/.vscode/settings.json	2023-07-06 15:08:30.000000000 +0800
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "conf": "c"
++    }
++}
+\ No newline at end of file
